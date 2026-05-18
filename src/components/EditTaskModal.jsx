@@ -1,8 +1,14 @@
+import { useMemo } from 'react';
 import { useTaskContext } from '../context/TaskContext';
 import TaskForm from './TaskForm';
 
 export default function EditTaskModal({ task, onClose }) {
   const { editTask } = useTaskContext();
+
+  const initial = useMemo(
+    () => ({ title: task.title, description: task.description, status: task.status }),
+    [task.title, task.description, task.status]
+  );
 
   const handleSubmit = async (form) => {
     await editTask(task.id, { ...task, ...form });
@@ -17,7 +23,7 @@ export default function EditTaskModal({ task, onClose }) {
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 w-full max-w-lg animate-fade-in">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Edit Task</h2>
         <TaskForm
-          initial={{ title: task.title, description: task.description, status: task.status }}
+          initial={initial}
           onSubmit={handleSubmit}
           onCancel={onClose}
           submitLabel="Save Changes"

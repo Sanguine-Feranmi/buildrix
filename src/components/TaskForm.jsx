@@ -17,7 +17,6 @@ export default function TaskForm({ initial = EMPTY, onSubmit, onCancel, submitLa
   const validate = (data) => {
     const errs = {};
     if (!data.title.trim()) errs.title = 'Title is required.';
-    if (!data.description.trim()) errs.description = 'Description is required.';
     return errs;
   };
 
@@ -29,9 +28,8 @@ export default function TaskForm({ initial = EMPTY, onSubmit, onCancel, submitLa
 
   const handleBlur = (e) => {
     const { name, value } = e.target;
-    if (!value.trim()) {
-      const label = name.charAt(0).toUpperCase() + name.slice(1);
-      setErrors((prev) => ({ ...prev, [name]: `${label} is required.` }));
+    if (name === 'title' && !value.trim()) {
+      setErrors((prev) => ({ ...prev, title: 'Title is required.' }));
     }
   };
 
@@ -47,7 +45,7 @@ export default function TaskForm({ initial = EMPTY, onSubmit, onCancel, submitLa
     try {
       await onSubmit(form);
     } catch (err) {
-      setApiError(err?.response?.data?.message || 'Something went wrong. Please try again.');
+      setApiError(err?.message || 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -74,17 +72,17 @@ export default function TaskForm({ initial = EMPTY, onSubmit, onCancel, submitLa
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Description <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
         <textarea
           name="description"
           value={form.description}
           onChange={handleChange}
-          onBlur={handleBlur}
           rows={3}
           className={inputCls('description')}
           placeholder="Enter task description"
         />
-        {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
       </div>
 
       <div>

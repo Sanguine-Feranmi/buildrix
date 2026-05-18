@@ -1,13 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTaskContext } from '../context/TaskContext';
 import TaskCard from '../components/TaskCard';
-import TaskSkeleton from '../components/TaskSkeleton';
 
 const PAGE_SIZE = 9;
 const FILTERS = ['All', 'Pending', 'Completed'];
 
 export default function TaskDashboard() {
-  const { tasks, loading, error, fetchTasks } = useTaskContext();
+  const { tasks } = useTaskContext();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
   const [page, setPage] = useState(1);
@@ -56,26 +55,7 @@ export default function TaskDashboard() {
         </div>
       </div>
 
-      {error && (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-          <span className="text-5xl">⚠️</span>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">{error}</p>
-          <button
-            onClick={fetchTasks}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {loading && !error && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <TaskSkeleton key={i} />)}
-        </div>
-      )}
-
-      {!loading && !error && filtered.length === 0 && (
+      {filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
           <span className="text-6xl">📋</span>
           <p className="text-gray-700 dark:text-gray-300 font-medium">No tasks found</p>
@@ -87,7 +67,7 @@ export default function TaskDashboard() {
         </div>
       )}
 
-      {!loading && !error && paginated.length > 0 && (
+      {paginated.length > 0 && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginated.map((task) => <TaskCard key={task.id} task={task} />)}

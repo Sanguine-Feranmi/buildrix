@@ -39,9 +39,6 @@ function AppShell() {
 
 export default function App() {
   useEffect(() => {
-    if (!import.meta.env.VITE_API_BASE_URL) {
-      console.warn('[Buildrix] VITE_API_BASE_URL is not set. Task fetching will fail in production.');
-    }
     if (storage.get('theme') === 'dark') {
       document.documentElement.classList.add('dark');
     }

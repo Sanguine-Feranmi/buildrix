@@ -1,33 +1,35 @@
-import axios from 'axios';
+const BASE_URL = 'https://dummyjson.com';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? '';
+async function request(path, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
 
-if (!baseURL) {
-  console.warn('[Buildrix] VITE_API_BASE_URL is not defined. API calls will fail.');
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    signal: options.signal ?? controller.signal,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+  }).finally(() => clearTimeout(timeout));
+
+  if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.statusText}`);
+  return res.json();
 }
 
-const api = axios.create({
-  baseURL,
-  timeout: 10000,
-});
+export const getTasks = (signal) =>
+  request('/todos?limit=30', { signal });
 
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    const status = err?.response?.status;
-    const url = err?.config?.url ?? '';
-    if (status) {
-      console.error(`[Buildrix] API error ${status} on ${url}`, err.response?.data ?? '');
-    } else if (err.code === 'ECONNABORTED') {
-      console.error('[Buildrix] Request timed out:', url);
-    } else {
-      console.error('[Buildrix] Network error:', err.message);
-    }
-    return Promise.reject(err);
-  }
-);
+export const createTask = (task) =>
+  request('/todos/add', {
+    method: 'POST',
+    body: JSON.stringify({ todo: task.title, completed: false, userId: 1 }),
+  });
 
-export const getTasks = (signal) => api.get('/', { signal });
-export const createTask = (task) => api.post('/', task);
-export const updateTask = (id, data) => api.put(`/${id}`, data);
-export const deleteTask = (id) => api.delete(`/${id}`);
+// Always use id 1 in the URL — local UUIDs are not valid DummyJSON ids.
+// Local state is the source of truth; this call is a formality.
+export const updateTask = (_id, task) =>
+  request('/todos/1', {
+    method: 'PUT',
+    body: JSON.stringify({ completed: task.completed }),
+  });
+
+export const deleteTask = (_id) =>
+  request('/todos/1', { method: 'DELETE' });
