@@ -13,7 +13,10 @@ export default function useTasks() {
       const { data } = await getTasks(signal);
       setTasks(data);
     } catch (err) {
-      if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
+      if (err.code === 'ECONNABORTED') {
+        setError('Request timed out. Check your connection and try again.');
+      } else {
         setError('Failed to load tasks. Please try again.');
       }
     } finally {

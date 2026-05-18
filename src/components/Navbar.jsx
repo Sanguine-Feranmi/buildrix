@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import storage from '../utils/storage';
 
 export default function Navbar({ onCreateClick }) {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
-    localStorage.setItem('theme', dark ? 'dark' : 'light');
+    storage.set('theme', dark ? 'dark' : 'light');
   }, [dark]);
 
   return (

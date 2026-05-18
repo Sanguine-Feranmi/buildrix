@@ -5,6 +5,8 @@ import TaskDashboard from './pages/TaskDashboard';
 import Navbar from './components/Navbar';
 import CreateTaskForm from './components/CreateTaskForm';
 import Toast from './components/Toast';
+import ErrorBoundary from './components/ErrorBoundary';
+import storage from './utils/storage';
 
 function AppShell() {
   const { toast } = useTaskContext();
@@ -37,16 +39,21 @@ function AppShell() {
 
 export default function App() {
   useEffect(() => {
-    if (localStorage.getItem('theme') === 'dark') {
+    if (!import.meta.env.VITE_API_BASE_URL) {
+      console.warn('[Buildrix] VITE_API_BASE_URL is not set. Task fetching will fail in production.');
+    }
+    if (storage.get('theme') === 'dark') {
       document.documentElement.classList.add('dark');
     }
   }, []);
 
   return (
     <BrowserRouter>
-      <TaskProvider>
-        <AppShell />
-      </TaskProvider>
+      <ErrorBoundary>
+        <TaskProvider>
+          <AppShell />
+        </TaskProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }
