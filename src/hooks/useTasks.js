@@ -7,6 +7,11 @@ export default function useTasks() {
   const [error, setError] = useState(null);
 
   const fetchTasks = useCallback(async (signal) => {
+    if (!import.meta.env.VITE_API_BASE_URL) {
+      setError('API URL is not configured. Set VITE_API_BASE_URL in your Vercel environment variables.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
