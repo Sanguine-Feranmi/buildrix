@@ -63,7 +63,7 @@ export default function TaskCard({ task }) {
           )}
         </p>
 
-        <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(task.createdAt)}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(task.created_at)}</p>
 
         <div className="flex items-center gap-2 pt-1 border-t border-gray-100 dark:border-gray-700">
           <button

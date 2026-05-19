@@ -1,12 +1,49 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTaskContext } from '../context/TaskContext';
 import TaskCard from '../components/TaskCard';
+import TaskSkeleton from '../components/TaskSkeleton';
+import TaskStats from '../components/TaskStats';
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 12;
 const FILTERS = ['All', 'Pending', 'Completed'];
 
+function PaginationBar({ page, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-2 mt-8">
+      <button
+        onClick={() => onPageChange((p) => Math.max(1, p - 1))}
+        disabled={page === 1}
+        className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
+      >
+        ← Prev
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+        <button
+          key={p}
+          onClick={() => onPageChange(p)}
+          className={`w-9 h-9 text-sm rounded-lg font-medium transition ${
+            p === page
+              ? 'bg-blue-600 text-white'
+              : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+          }`}
+        >
+          {p}
+        </button>
+      ))}
+      <button
+        onClick={() => onPageChange((p) => Math.min(totalPages, p + 1))}
+        disabled={page === totalPages}
+        className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
+      >
+        Next →
+      </button>
+    </div>
+  );
+}
+
 export default function TaskDashboard() {
-  const { tasks } = useTaskContext();
+  const { tasks, loading, error } = useTaskContext();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
   const [page, setPage] = useState(1);
@@ -31,6 +68,7 @@ export default function TaskDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <TaskStats tasks={tasks} />
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <input
           value={search}
@@ -55,7 +93,20 @@ export default function TaskDashboard() {
         </div>
       </div>
 
-      {filtered.length === 0 && (
+      {error && (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <span className="text-5xl">⚠️</span>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">{error}</p>
+        </div>
+      )}
+
+      {loading && !error && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => <TaskSkeleton key={i} />)}
+        </div>
+      )}
+
+      {!loading && !error && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
           <span className="text-6xl">📋</span>
           <p className="text-gray-700 dark:text-gray-300 font-medium">No tasks found</p>
@@ -67,43 +118,12 @@ export default function TaskDashboard() {
         </div>
       )}
 
-      {paginated.length > 0 && (
+      {!loading && !error && paginated.length > 0 && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginated.map((task) => <TaskCard key={task.id} task={task} />)}
           </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-8">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
-              >
-                ← Prev
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`w-9 h-9 text-sm rounded-lg font-medium transition ${
-                    p === page
-                      ? 'bg-blue-600 text-white'
-                      : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition"
-              >
-                Next →
-              </button>
-            </div>
-          )}
+          <PaginationBar page={page} totalPages={totalPages} onPageChange={setPage} />
         </>
       )}
     </div>

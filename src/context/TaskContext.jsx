@@ -1,12 +1,12 @@
 import { createContext, useContext, useRef, useState } from 'react';
+import { useAuth } from './AuthContext';
 import useTasks from '../hooks/useTasks';
-import { createTask, updateTask, deleteTask } from '../services/taskService';
-import { normalizeTask } from '../utils/normalizeTask';
 
 const TaskContext = createContext(null);
 
 export function TaskProvider({ children }) {
-  const { tasks, setTasks } = useTasks();
+  const { user } = useAuth();
+  const { tasks, loading, error, addMutation, editMutation, removeMutation, toggleMutation } = useTasks(user);
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
@@ -17,66 +17,36 @@ export function TaskProvider({ children }) {
   };
 
   const addTask = async (taskData) => {
-    const raw = await createTask(taskData);
-    // Merge form data over the API response so the user's chosen status and
-    // description are preserved — DummyJSON always returns completed: false.
-    // Replace the API's duplicate id: 256 with a guaranteed-unique local UUID.
-    const merged = {
-      ...raw,
-      id: crypto.randomUUID(),
-      title: taskData.title,
-      description: taskData.description || '',
-      status: taskData.status,
-      completed: taskData.status === 'Completed',
-      createdAt: new Date().toISOString(),
-    };
-    const normalized = normalizeTask(merged);
-    setTasks((prev) => [normalized, ...prev]);
+    await addMutation.mutateAsync(taskData);
     showToast('Task created successfully!');
-    return normalized;
   };
 
   const editTask = async (id, taskData) => {
-    await updateTask(id, taskData);
-    // Build the updated task from local data — don't trust the DummyJSON
-    // PUT response since it won't know about our UUID or description.
-    const normalized = normalizeTask({
+    await editMutation.mutateAsync({
       id,
-      title: taskData.title,
-      description: taskData.description || '',
-      status: taskData.status,
-      completed: taskData.status === 'Completed',
-      createdAt: taskData.createdAt,
+      updates: { title: taskData.title, description: taskData.description || '', status: taskData.status },
     });
-    setTasks((prev) => prev.map((t) => (t.id === id ? normalized : t)));
     showToast('Task updated successfully!');
-    return normalized;
   };
 
   const removeTask = async (id) => {
-    await deleteTask(id);
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    await removeMutation.mutateAsync(id);
     showToast('Task deleted successfully!');
   };
 
   const toggleStatus = async (task) => {
-    const flipped = {
-      ...task,
-      status: task.status === 'Pending' ? 'Completed' : 'Pending',
-      completed: !task.completed,
-    };
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? flipped : t)));
+    const newStatus = task.status === 'Pending' ? 'Completed' : 'Pending';
     try {
-      await updateTask(task.id, flipped);
+      await toggleMutation.mutateAsync({ id: task.id, status: newStatus });
+      showToast('Status updated successfully!');
     } catch (err) {
       console.error('[Buildrix] toggleStatus failed:', err);
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
       showToast('Failed to update status.', 'error');
     }
   };
 
   return (
-    <TaskContext.Provider value={{ tasks, addTask, editTask, removeTask, toggleStatus, toast }}>
+    <TaskContext.Provider value={{ tasks, loading, error, addTask, editTask, removeTask, toggleStatus, toast }}>
       {children}
     </TaskContext.Provider>
   );

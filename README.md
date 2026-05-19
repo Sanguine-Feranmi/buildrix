@@ -1,6 +1,6 @@
 # Buildrix
 
-A responsive task management web application built with React 19, Vite, and Tailwind CSS v4. Supports full CRUD, real-time search and filtering, dark mode, optimistic updates, and toast notifications.
+A responsive, full-stack task management web application built with React 19, Vite, Tailwind CSS v4, Supabase, and TanStack Query. Supports authenticated CRUD, real-time sync, dark mode, search, filtering, and pagination.
 
 ---
 
@@ -11,8 +11,8 @@ A responsive task management web application built with React 19, Vite, and Tail
 | UI Framework | React 19 (functional components + hooks) |
 | Routing | React Router DOM v7 |
 | Styling | Tailwind CSS v4 |
-| HTTP Client | Axios |
-| Mock Backend | JSON Server |
+| Backend & Database | Supabase (PostgreSQL + Auth + Realtime) |
+| Server State | TanStack Query v5 |
 | Build Tool | Vite |
 
 ---
@@ -23,6 +23,7 @@ A responsive task management web application built with React 19, Vite, and Tail
 
 - Node.js 18 or higher
 - npm 9 or higher
+- A free [Supabase](https://supabase.com) project
 
 ### Installation
 
@@ -30,15 +31,46 @@ A responsive task management web application built with React 19, Vite, and Tail
 npm install
 ```
 
-### Running the app
+### Environment variables
 
-You need two terminals running simultaneously.
+Copy `.env.example` to `.env` and fill in your Supabase project values:
 
 ```bash
-# Terminal 1 — start the JSON Server mock API on port 3001
-npm run server
+cp .env.example .env
+```
 
-# Terminal 2 — start the Vite dev server
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+### Supabase database setup
+
+Run the following SQL in your Supabase SQL Editor:
+
+```sql
+create table tasks (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  description text default '',
+  status text default 'Pending' check (status in ('Pending', 'Completed')),
+  created_at timestamptz default now(),
+  user_id uuid references auth.users(id)
+);
+
+alter table tasks enable row level security;
+
+create policy "Users manage own tasks" on tasks
+  for all using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Enable Realtime
+alter publication supabase_realtime add table public.tasks;
+```
+
+### Running the app
+
+```bash
 npm run dev
 ```
 
@@ -49,7 +81,6 @@ Then open [http://localhost:5173](http://localhost:5173) in your browser.
 | Script | Description |
 |--------|-------------|
 | `npm run dev` | Start the Vite development server |
-| `npm run server` | Start JSON Server on port 3001 |
 | `npm run build` | Build for production |
 | `npm run preview` | Preview the production build locally |
 | `npm run lint` | Run ESLint |
@@ -63,20 +94,29 @@ src/
 ├── components/
 │   ├── CreateTaskForm.jsx   # Modal form for creating a new task
 │   ├── EditTaskModal.jsx    # Modal form for editing an existing task
-│   ├── Navbar.jsx           # Top navigation bar with dark mode toggle
-│   ├── TaskCard.jsx         # Individual task card with actions
+│   ├── ErrorBoundary.jsx    # Catches uncaught render errors
+│   ├── Navbar.jsx           # Top navigation bar with dark mode toggle and user info
+│   ├── TaskCard.jsx         # Individual task card with full CRUD actions
 │   ├── TaskForm.jsx         # Shared controlled form used by create and edit
 │   ├── TaskSkeleton.jsx     # Animated loading placeholder card
 │   └── Toast.jsx            # Lightweight toast notification
 ├── context/
-│   └── TaskContext.jsx      # Global state and all CRUD handlers
+│   ├── AuthContext.jsx      # Supabase session state and sign out
+│   └── TaskContext.jsx      # Task state and all CRUD handlers
 ├── hooks/
-│   └── useTasks.js          # Fetch logic with loading and error state
+│   └── useTasks.js          # TanStack Query fetch, mutations, and Realtime subscription
+├── lib/
+│   └── supabaseClient.js    # Supabase client initialisation
 ├── pages/
+│   ├── auth/
+│   │   ├── SignIn.jsx       # Email/password sign in
+│   │   └── SignUp.jsx       # Account registration
 │   └── TaskDashboard.jsx    # Main dashboard with grid, search, filter, pagination
 ├── services/
-│   └── taskService.js       # All axios API calls (GET, POST, PUT, DELETE)
-├── App.jsx                  # Root component, routing, modal overlay, toast
+│   └── taskService.js       # All Supabase API calls and first-login seed function
+├── utils/
+│   └── storage.js           # Safe localStorage wrapper (Safari private mode safe)
+├── App.jsx                  # Root component, routing, auth protection, QueryClientProvider
 ├── index.css                # Tailwind import, dark mode variant, animations
 └── main.jsx                 # React DOM entry point
 ```
@@ -85,17 +125,30 @@ src/
 
 ## Features
 
+### Authentication
+- Email and password sign up and sign in via Supabase Auth
+- Protected routes — unauthenticated users are redirected to `/signin`
+- Signed-in user's email displayed in the navbar with a sign out button
+
+### First-Login Seeding
+- On a new user's first login, 100 tasks are automatically imported from the JSONPlaceholder public API and inserted into their Supabase account as real, fully editable rows
+- On all subsequent logins, existing tasks are loaded directly — seeding never runs again
+
 ### Task Management
-- **Create** — form with title, description, and status fields; inline validation on blur and submit
+- **Create** — form with title, description, and status fields; inline validation on blur and submit (title min 3 chars)
 - **Edit** — pre-populated modal; stays open and shows error on API failure without losing edits
-- **Delete** — inline confirmation prompt before executing; optimistic removal with rollback on failure
-- **Toggle status** — switches between Pending and Completed instantly; optimistic update with rollback
+- **Delete** — inline confirmation prompt before executing
+- **Toggle status** — switches between Pending and Completed with optimistic update and rollback on failure
+
+### Real-Time Sync
+- Supabase Realtime subscription keeps the task board in sync across browser tabs and devices instantly
+- TanStack Query cache is invalidated on every Realtime event so the UI always reflects the database state
 
 ### Dashboard
 - Responsive card grid — 1 column on mobile, 2 on tablet, 3 on desktop
-- Loading skeleton UI while tasks are being fetched
+- Loading skeleton UI while tasks are being fetched or seeded
 - Empty state message when no tasks exist or no results match
-- Error state with a retry button if the fetch fails
+- Error state if the fetch fails
 
 ### Search & Filter
 - Real-time title search — client-side, no API call per keystroke
@@ -108,8 +161,9 @@ src/
 
 ### Dark Mode
 - Toggle in the navbar
-- Preference persisted in `localStorage` and restored on page load
-- Applied via Tailwind's `dark:` variant throughout all components
+- Preference persisted in `localStorage` under the key `buildrix-theme`
+- Restored on page load and applied via Tailwind's `dark:` variant throughout all components
+- localStorage access wrapped in try/catch for Safari private mode safety
 
 ### Toast Notifications
 - Custom lightweight implementation — no external library
@@ -121,24 +175,26 @@ src/
 
 ## API
 
-JSON Server exposes a REST API at `http://localhost:3001/tasks`.
+All data is stored in Supabase PostgreSQL. The `taskService.js` module wraps all database calls.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/tasks` | Fetch all tasks |
-| POST | `/tasks` | Create a new task |
-| PUT | `/tasks/:id` | Replace a task by ID |
-| DELETE | `/tasks/:id` | Delete a task by ID |
+| Operation | Function | Description |
+|-----------|----------|-------------|
+| Fetch all | `getTasks()` | Returns all tasks for the authenticated user, ordered by `created_at` descending |
+| Create | `createTask(task)` | Inserts a new task row with the user's `user_id` |
+| Update | `updateTask(id, updates)` | Updates a task by UUID |
+| Delete | `deleteTask(id)` | Deletes a task by UUID |
+| Seed | `seedTasksFromPublicAPI(userId)` | Imports 100 tasks from JSONPlaceholder — runs once per new user |
 
-Task shape:
+Task shape (Supabase row):
 
 ```json
 {
-  "id": "1",
+  "id": "uuid",
   "title": "Example task",
-  "description": "A short description of the task.",
+  "description": "A short description.",
   "status": "Pending",
-  "createdAt": "2025-01-01T00:00:00.000Z"
+  "created_at": "2025-01-01T00:00:00.000Z",
+  "user_id": "uuid"
 }
 ```
 
@@ -146,8 +202,27 @@ Task shape:
 
 ## Architecture Notes
 
-- All API calls are isolated in `services/taskService.js` — no raw axios calls inside components
-- Global state lives in `TaskContext` and is consumed via the `useTaskContext` hook
-- Fetch logic, loading state, and error state are encapsulated in `useTasks.js`
-- Optimistic updates are applied immediately on delete and status toggle, with full rollback if the request fails
-- Fetch requests are cancelled via `AbortController` when the provider unmounts to prevent state updates on unmounted components
+- All Supabase calls are isolated in `services/taskService.js` — no direct database calls inside components
+- Server state is managed by TanStack Query — `useQuery` for fetching, `useMutation` for writes
+- The `['tasks', user.id]` query key scopes the cache per user so switching accounts never shows stale data
+- Supabase Realtime subscription is set up in `useTasks.js` and invalidates the TanStack Query cache on every INSERT, UPDATE, and DELETE event
+- `AuthContext` owns the Supabase session and exposes `user` and `signOut`
+- `TaskContext` consumes `AuthContext` and passes `user` to `useTasks` — no prop drilling
+- Dark mode is the only data stored in `localStorage` — all task data lives in Supabase
+
+---
+
+## Deployment
+
+The app is deployed on Vercel. Set the following environment variables in the Vercel dashboard under **Settings → Environment Variables** for Production, Preview, and Development:
+
+| Variable | Value |
+|----------|-------|
+| `VITE_SUPABASE_URL` | Your Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Your Supabase anon public key |
+
+The `vercel.json` at the project root contains the SPA rewrite rule required for client-side routing:
+
+```json
+{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
+```

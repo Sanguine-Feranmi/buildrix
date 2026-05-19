@@ -1,35 +1,56 @@
-const BASE_URL = 'https://dummyjson.com';
+import { supabase } from '../lib/supabaseClient';
 
-async function request(path, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+export const getTasks = async () => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data;
+};
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    signal: options.signal ?? controller.signal,
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-  }).finally(() => clearTimeout(timeout));
+export const createTask = async (task) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert([{ title: task.title, description: task.description || '', status: task.status, user_id: user.id }])
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+};
 
-  if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.statusText}`);
-  return res.json();
-}
+export const updateTask = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+};
 
-export const getTasks = (signal) =>
-  request('/todos?limit=30', { signal });
+export const deleteTask = async (id) => {
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+};
 
-export const createTask = (task) =>
-  request('/todos/add', {
-    method: 'POST',
-    body: JSON.stringify({ todo: task.title, completed: false, userId: 1 }),
-  });
+export const seedTasksFromPublicAPI = async (userId) => {
+  const response = await fetch('https://jsonplaceholder.typicode.com/todos?_limit=100');
+  if (!response.ok) throw new Error('Failed to fetch seed tasks');
+  const raw = await response.json();
 
-// Always use id 1 in the URL — local UUIDs are not valid DummyJSON ids.
-// Local state is the source of truth; this call is a formality.
-export const updateTask = (_id, task) =>
-  request('/todos/1', {
-    method: 'PUT',
-    body: JSON.stringify({ completed: task.completed }),
-  });
+  const tasks = raw.map((item) => ({
+    title: item.title.charAt(0).toUpperCase() + item.title.slice(1),
+    description: 'Task imported from public feed. Edit as needed.',
+    status: item.completed ? 'Completed' : 'Pending',
+    user_id: userId,
+  }));
 
-export const deleteTask = (_id) =>
-  request('/todos/1', { method: 'DELETE' });
+  const { error } = await supabase.from('tasks').insert(tasks);
+  if (error) throw new Error(`Seed failed: ${error.message}`);
+};
